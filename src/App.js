@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MessageList, Input, Button } from 'react-chat-elements';
 import 'react-chat-elements/dist/main.css';
 import './App.css';  // 커스텀 스타일을 추가할 수 있는 파일
@@ -6,55 +6,52 @@ import './App.css';  // 커스텀 스타일을 추가할 수 있는 파일
 const App = () => {
   const [messages, setMessages] = useState([]);
   const [currentMessage, setCurrentMessage] = useState('');
-
-  let ws;
+  const [error, setError] = useState(null);
+  const ws = useRef(null);
 
   useEffect(() => {
     // WebSocket 연결 설정, useEffect 훅을 사용하여 컴포넌트가 마운트될 때 WebSocket 연결을 설정
-    ws = new WebSocket('ws://localhost:8080/ws');
+    ws.current = new WebSocket('ws://localhost:8080/chat');
 
-    ws.onopen = () => {
+    ws.current.onopen = () => {
       console.log('WebSocket connected');
     };
 
-    ws.onmessage = (event) => {
+    ws.current.onmessage = (event) => {
       setCurrentMessage(event.data);
     };
 
-    ws.onclose = () => {
+    ws.current.onclose = () => {
       console.log('WebSocket disconnected');
     };
-
-    ws.onerror = (error) => {
+    
+    ws.current.onerror = (error) => {
       console.error('WebSocket error:', error);
+      setError('WebSocket error occurred');
     };
 
     return () => {
-      ws.close();
+      ws.current.close();
     };
   }, []);
 
   const handleSendMessage = () => {
 
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(messages);
-      setMessages('');
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) { 
+      try{
+        const messageObject = { context: currentMessage, roomId : 24071601, userId: 'ysw3114' };  // JSON 형식으로 전송
+        ws.current.send(JSON.stringify(messageObject));
+        setMessages('');
+
+      } catch (error) {
+        console.error('Error stringifying message:', error);
+        setError('Error sending message');
+      }
+      
     }
-
-    // fetch('http://localhost:8080/chatroom', {
-    //   method: 'POST',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //   },
-    //   body: JSON.stringify(messages),
-    // })
-    //   .then(response => response.text())
-    //   .then(data => {
-    //     // setResponse(data);
-    //     setCurrentMessage(''); // 메시지 전송 후 입력 필드를 비웁니다.
-    //   })
-    //   .catch(error => console.error('Error sending message:', error));
-
+    else {
+      setError('WebSocket is not connected');
+    }
 
     if (currentMessage.trim() !== '') {
       const newMessage = {
